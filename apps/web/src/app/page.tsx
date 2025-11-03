@@ -1,64 +1,87 @@
-import Image from "next/image";
+// # Objetivo:
+// Desenvolver o front-end do projeto **Teologos**, uma plataforma SaaS em Português do Brasil
+// que permite conversar com agentes de IA especializados em teólogos clássicos (Agostinho,
+// Tomás de Aquino, Calvino etc). Cada agente é um “teólogo digital” com estilo e comportamento
+// fiel ao autor original.
+
+// # Stack:
+// - Next.js 14 (App Router)
+// - React 18
+// - Tailwind CSS
+// - Axios para chamadas HTTP
+// - Comunicação com a API local em http://localhost:4000
+// - UI moderna, minimalista e teológica (tons neutros, legível, foco no conteúdo)
+
+// # Páginas iniciais:
+// 1. `/` – tela principal de chat:
+//    - Header com logo “Teologos”.
+//    - Dropdown para selecionar o agente (ex: Agostinho, Aquino, Calvino).
+//    - Caixa de entrada (input multiline) para a pergunta.
+//    - Botão “Perguntar”.
+//    - Área de resposta com:
+//        - Texto retornado pela API.
+//        - Citações formatadas no padrão “[[obra, seção/página]]”.
+//        - Scroll suave e fundo neutro.
+// 2. `/about` – texto curto sobre o projeto.
+// 3. `/login` – placeholder de autenticação futura (Auth0).
+
+// # Funcionalidades:
+// - Enviar POST para `http://localhost:4000/chat` com `{ agent, message }`.
+// - Renderizar a resposta (`answer`) e as citações (`citations[]`).
+// - Exibir loading state enquanto aguarda resposta.
+// - Lidar com erros (toast simples ou mensagem em vermelho).
+// - Layout responsivo (desktop/mobile).
+
+// # Diretrizes visuais:
+// - Tema claro e tipografia legível (Inter ou Roboto).
+// - Container central com largura máxima de 720px.
+// - Bordas arredondadas, espaçamento generoso, foco no texto.
+// - Textos e botões em PT-BR (“Perguntar”, “Selecione um teólogo”, etc).
+// - Modo escuro opcional no futuro.
+
+// # Saída esperada:
+// Gere a estrutura base do projeto:
+// - `src/app/page.tsx` – tela principal de chat.
+// - `src/components/ChatBox.tsx` – componente de chat com input e resposta.
+// - `src/components/Header.tsx` – cabeçalho simples com logo e seleção de teólogo.
+// - `src/styles/globals.css` – Tailwind configurado.
+
+// Implemente componentes funcionais e estados React usando TypeScript.
+// O código deve rodar imediatamente com `npm run dev` ou `yarn dev`.
+
+"use client";
+
+import { useMemo, useState } from "react";
+
+import { ChatBox } from "@/components/ChatBox";
+import { Header } from "@/components/Header";
+
+const AGENTS = [
+  "Agostinho de Hipona",
+  "Tomás de Aquino",
+  "João Calvino",
+  "Martinho Lutero",
+  "Teresa de Ávila",
+] as const;
 
 export default function Home() {
+  const [selectedAgent, setSelectedAgent] = useState<(typeof AGENTS)[number]>(
+    AGENTS[0],
+  );
+
+  const availableAgents = useMemo(() => [...AGENTS], []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-screen bg-[var(--background)] py-10 font-sans text-[var(--foreground)]">
+      <main className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-4xl flex-col gap-10 px-4 pb-16 md:px-6 lg:px-8">
+        <Header
+          agents={availableAgents}
+          selectedAgent={selectedAgent}
+          onAgentChange={(agent) =>
+            setSelectedAgent(agent as (typeof AGENTS)[number])
+          }
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        <ChatBox agent={selectedAgent} />
       </main>
     </div>
   );
