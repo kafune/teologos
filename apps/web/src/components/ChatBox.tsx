@@ -1,25 +1,95 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
-import axios from "axios";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { postAsk } from "@/lib/api";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type ChatResponse = {
   answer: string;
-  citations?: string[];
+  citations?: unknown[];
 };
 
 type ChatEntry = {
   id: string;
   question: string;
+  agentName: string;
   response: ChatResponse;
 };
 
 type ChatBoxProps = {
-  agent: string;
+  agentId: string;
+  agentName: string;
 };
 
-export function ChatBox({ agent }: ChatBoxProps) {
+const markdownComponents = {
+  p({ ...props }) {
+    return <p className="mt-0 mb-3 last:mb-0" {...props} />;
+  },
+  a({ ...props }) {
+    return (
+      <a
+        className="font-semibold text-[var(--accent)] underline decoration-[var(--accent)]/40 underline-offset-2 hover:text-[var(--accent)]/80"
+        {...props}
+      />
+    );
+  },
+  ul({ ...props }) {
+    return <ul className="mb-3 list-disc space-y-2 pl-5 last:mb-0" {...props} />;
+  },
+  ol({ ...props }) {
+    return <ol className="mb-3 list-decimal space-y-2 pl-5 last:mb-0" {...props} />;
+  },
+  li({ ...props }) {
+    return <li className="text-inherit" {...props} />;
+  },
+  blockquote({ ...props }) {
+    return (
+      <blockquote
+        className="border-l-4 border-[var(--accent)]/40 pl-4 text-slate-600 dark:text-slate-300"
+        {...props}
+      />
+    );
+  },
+  code({ inline, children, ...props }) {
+    if (inline) {
+      return (
+        <code
+          className="rounded-md border border-slate-300/60 bg-slate-100 px-1.5 py-0.5 text-sm font-medium leading-relaxed dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200"
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+
+    return (
+      <pre className="overflow-x-auto rounded-xl border border-slate-300/60 bg-slate-950/90 p-4 text-sm leading-relaxed text-slate-100 dark:border-slate-800">
+        <code className="block whitespace-pre" {...props}>
+          {children}
+        </code>
+      </pre>
+    );
+  },
+} satisfies Components;
+
+const generateEntryId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+export function ChatBox({ agentId, agentName }: ChatBoxProps) {
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState<ChatEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,8 +120,9 @@ export function ChatBox({ agent }: ChatBoxProps) {
     setError(null);
 
     const newEntry: ChatEntry = {
-      id: crypto.randomUUID(),
+      id: generateEntryId(),
       question: trimmed,
+      agentName,
       response: {
         answer: "",
         citations: [],
@@ -62,16 +133,11 @@ export function ChatBox({ agent }: ChatBoxProps) {
     setMessage("");
 
     try {
-      const { data } = await axios.post<ChatResponse>(
-        "http://localhost:4000/chat",
-        {
-          agent,
-          message: trimmed,
-        },
-        {
-          timeout: 45000,
-        },
-      );
+      const data = await postAsk({
+        agent: agentId,
+        message: trimmed,
+        stream: false,
+      });
 
       setHistory((prev) =>
         prev.map((entry) =>
@@ -108,6 +174,12 @@ export function ChatBox({ agent }: ChatBoxProps) {
     }
   };
 
+  useEffect(() => {
+    setHistory([]);
+    setMessage("");
+    setError(null);
+  }, [agentId]);
+
   return (
     <section className="flex h-full w-full flex-1 flex-col gap-6">
       <div className="flex-1 overflow-hidden rounded-3xl bg-[var(--surface)]/90 p-6 shadow ring-1 ring-[var(--border)]/80 backdrop-blur">
@@ -130,8 +202,7 @@ export function ChatBox({ agent }: ChatBoxProps) {
                   Converse com os maiores teólogos da história.
                 </p>
                 <p className="text-sm text-slate-400 dark:text-slate-200">
-                  Envie sua pergunta para {agent} e receba uma resposta
-                  embasada.
+                  Envie sua pergunta para {agentName} e receba uma resposta embasada.
                 </p>
               </div>
             </div>
@@ -141,24 +212,28 @@ export function ChatBox({ agent }: ChatBoxProps) {
               key={entry.id}
               className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/80 p-5"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 rounded-2xl bg-white/90 p-4 ring-1 ring-[var(--border)] dark:bg-slate-800/85">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)]/15 text-sm font-semibold text-[var(--accent)]">
                   Você
                 </div>
-                <p className="text-base leading-relaxed text-slate-600">
+                <p className="text-base leading-relaxed text-slate-700 dark:text-slate-200">
                   {entry.question}
                 </p>
               </div>
 
-              <div className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 ring-1 ring-[var(--border)]">
+              <div className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 ring-1 ring-[var(--border)] dark:bg-slate-900/70">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--accent-foreground)]">
-                  {agent[0]?.toUpperCase() ?? "IA"}
+                  {entry.agentName[0]?.toUpperCase() ?? "IA"}
                 </div>
                 <div className="flex flex-col gap-3">
                   {entry.response.answer ? (
-                    <p className="text-base leading-relaxed text-slate-700 dark:text-slate-100">
+                    <ReactMarkdown
+                      className="flex flex-col gap-3 text-base leading-relaxed text-slate-700 dark:text-slate-200"
+                      remarkPlugins={[remarkGfm]}
+                      components={markdownComponents}
+                    >
                       {entry.response.answer}
-                    </p>
+                    </ReactMarkdown>
                   ) : (
                     <p className="text-sm text-slate-400 dark:text-slate-300">
                       Elaborando resposta...
@@ -167,9 +242,12 @@ export function ChatBox({ agent }: ChatBoxProps) {
                   {entry.response.citations &&
                     entry.response.citations.length > 0 && (
                       <ul className="flex flex-col gap-1 rounded-xl bg-[var(--surface-muted)]/70 p-3 text-xs text-slate-500">
-                        {entry.response.citations.map((citation) => (
-                          <li key={citation} className="font-medium">
-                            [[{citation}]]
+                        {entry.response.citations.map((citation, index) => (
+                          <li key={`${entry.id}-citation-${index}`} className="font-medium">
+                            [[
+                            {typeof citation === "string"
+                              ? citation
+                              : JSON.stringify(citation)}]]
                           </li>
                         ))}
                       </ul>
@@ -191,12 +269,12 @@ export function ChatBox({ agent }: ChatBoxProps) {
         <textarea
           id="message"
           name="message"
-          placeholder={`Digite sua mensagem para ${agent}...`}
+          placeholder={`Digite sua mensagem para ${agentName}...`}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           onKeyDown={handleKeyDown}
           rows={4}
-          className="w-full resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-3 text-base text-slate-700 shadow-inner focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+          className="w-full resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-3 text-base text-slate-700 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-300 shadow-inner focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
         />
         {error && (
           <p className="text-sm font-medium text-red-500" role="alert">
