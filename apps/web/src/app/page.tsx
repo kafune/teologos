@@ -1,87 +1,135 @@
-// # Objetivo:
-// Desenvolver o front-end do projeto **Teologos**, uma plataforma SaaS em Português do Brasil
-// que permite conversar com agentes de IA especializados em teólogos clássicos (Agostinho,
-// Tomás de Aquino, Calvino etc). Cada agente é um “teólogo digital” com estilo e comportamento
-// fiel ao autor original.
-
-// # Stack:
-// - Next.js 14 (App Router)
-// - React 18
-// - Tailwind CSS
-// - Axios para chamadas HTTP
-// - Comunicação com a API local em http://localhost:4000
-// - UI moderna, minimalista e teológica (tons neutros, legível, foco no conteúdo)
-
-// # Páginas iniciais:
-// 1. `/` – tela principal de chat:
-//    - Header com logo “Teologos”.
-//    - Dropdown para selecionar o agente (ex: Agostinho, Aquino, Calvino).
-//    - Caixa de entrada (input multiline) para a pergunta.
-//    - Botão “Perguntar”.
-//    - Área de resposta com:
-//        - Texto retornado pela API.
-//        - Citações formatadas no padrão “[[obra, seção/página]]”.
-//        - Scroll suave e fundo neutro.
-// 2. `/about` – texto curto sobre o projeto.
-// 3. `/login` – placeholder de autenticação futura (Auth0).
-
-// # Funcionalidades:
-// - Enviar POST para `http://localhost:4000/chat` com `{ agent, message }`.
-// - Renderizar a resposta (`answer`) e as citações (`citations[]`).
-// - Exibir loading state enquanto aguarda resposta.
-// - Lidar com erros (toast simples ou mensagem em vermelho).
-// - Layout responsivo (desktop/mobile).
-
-// # Diretrizes visuais:
-// - Tema claro e tipografia legível (Inter ou Roboto).
-// - Container central com largura máxima de 720px.
-// - Bordas arredondadas, espaçamento generoso, foco no texto.
-// - Textos e botões em PT-BR (“Perguntar”, “Selecione um teólogo”, etc).
-// - Modo escuro opcional no futuro.
-
-// # Saída esperada:
-// Gere a estrutura base do projeto:
-// - `src/app/page.tsx` – tela principal de chat.
-// - `src/components/ChatBox.tsx` – componente de chat com input e resposta.
-// - `src/components/Header.tsx` – cabeçalho simples com logo e seleção de teólogo.
-// - `src/styles/globals.css` – Tailwind configurado.
-
-// Implemente componentes funcionais e estados React usando TypeScript.
-// O código deve rodar imediatamente com `npm run dev` ou `yarn dev`.
-
 "use client";
 
-import { useMemo, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChatBox } from "@/components/ChatBox";
 import { Header } from "@/components/Header";
+import type { AgentDto } from "@/lib/api";
+import { fetchAgents, UnauthorizedError } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
 
-const AGENTS = [
-  "Agostinho de Hipona",
-  "Tomás de Aquino",
-  "João Calvino",
-  "Martinho Lutero",
-  "Teresa de Ávila",
-] as const;
+type AgentOption = {
+  id: string;
+  label: string;
+  tradition: string;
+};
 
 export default function Home() {
-  const [selectedAgent, setSelectedAgent] = useState<(typeof AGENTS)[number]>(
-    AGENTS[0],
-  );
+  const { token, isReady, logout } = useAuth();
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+  const [isLoadingAgents, setIsLoadingAgents] = useState<boolean>(false);
+  const router = useRouter();
 
-  const availableAgents = useMemo(() => [...AGENTS], []);
+  useEffect(() => {
+    if (!isReady) return;
+    if (!token) {
+      router.replace("/login");
+    }
+  }, [isReady, token, router]);
+
+  useEffect(() => {
+    if (!isReady || !token) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadAgents = async () => {
+      setIsLoadingAgents(true);
+      setAgentsError(null);
+      try {
+        const data = await fetchAgents({
+          token,
+          signal: controller.signal,
+        });
+        const normalized = data.map((agent: AgentDto) => ({
+          id: agent.id,
+          label: agent.name,
+          tradition: agent.tradition,
+        }));
+
+        setAgents(normalized);
+      } catch (error) {
+        if (error instanceof UnauthorizedError) {
+          logout();
+          router.replace("/login");
+          return;
+        }
+
+        const isAbortError =
+          error instanceof DOMException
+            ? error.name === "AbortError"
+            : (error as { name?: string }).name === "AbortError";
+
+        if (isAbortError) {
+          return;
+        }
+
+        console.error("Falha ao carregar agentes:", error);
+        setAgentsError(
+          "Não foi possível carregar a lista de teólogos. Tente novamente mais tarde.",
+        );
+      } finally {
+        setIsLoadingAgents(false);
+      }
+    };
+
+    loadAgents();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isReady, token, logout, router]);
+
+  useEffect(() => {
+    if (!selectedAgentId && agents.length > 0) {
+      setSelectedAgentId(agents[0].id);
+    } else if (
+      selectedAgentId &&
+      agents.length > 0 &&
+      !agents.some((agent) => agent.id === selectedAgentId)
+    ) {
+      setSelectedAgentId(agents[0].id);
+    }
+  }, [agents, selectedAgentId]);
+
+  const selectedAgent = useMemo(() => {
+    if (!selectedAgentId) return null;
+    return agents.find((agent) => agent.id === selectedAgentId) ?? null;
+  }, [agents, selectedAgentId]);
 
   return (
     <div className="min-h-screen bg-[var(--background)] py-10 font-sans text-[var(--foreground)]">
       <main className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-4xl flex-col gap-10 px-4 pb-16 md:px-6 lg:px-8">
         <Header
-          agents={availableAgents}
-          selectedAgent={selectedAgent}
-          onAgentChange={(agent) =>
-            setSelectedAgent(agent as (typeof AGENTS)[number])
-          }
+          agents={agents}
+          selectedAgentId={selectedAgentId ?? ""}
+          onAgentChange={(agentId) => setSelectedAgentId(agentId)}
+          loading={isLoadingAgents}
         />
-        <ChatBox agent={selectedAgent} />
+
+        {agentsError ? (
+          <div className="rounded-3xl border border-red-200 bg-red-50/80 p-6 text-sm text-red-600">
+            {agentsError}
+          </div>
+        ) : null}
+
+        {selectedAgent ? (
+          <ChatBox
+            agentId={selectedAgent.id}
+            agentName={selectedAgent.label}
+          />
+        ) : isLoadingAgents ? (
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)]/90 p-6 text-center text-sm text-slate-500">
+            Carregando agentes...
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)]/90 p-6 text-center text-sm text-slate-500">
+            Selecione um teólogo para iniciar a conversa.
+          </div>
+        )}
       </main>
     </div>
   );

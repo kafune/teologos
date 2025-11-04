@@ -9,13 +9,22 @@ import {
   useRef,
   useState,
 } from "react";
-import { postAsk } from "@/lib/api";
+import { postAsk, UnauthorizedError } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+type CitationData = {
+  author?: string | null;
+  title?: string | null;
+  section?: string | null;
+  page?: string | number | null;
+  url?: string | null;
+};
+
 type ChatResponse = {
   answer: string;
-  citations?: unknown[];
+  citations?: (string | CitationData | null | undefined)[];
 };
 
 type ChatEntry = {
@@ -81,6 +90,47 @@ const markdownComponents = {
   },
 } satisfies Components;
 
+const formatCitation = (citation: unknown): string | null => {
+  if (!citation) {
+    return null;
+  }
+
+  if (typeof citation === "string") {
+    const title = citation.trim();
+    return title ? `[[Agostinho, ${title}]]` : null;
+  }
+
+  if (typeof citation === "object") {
+    const { author, title, section, page, url } = citation as CitationData;
+
+    const parts: string[] = [];
+    if (typeof author === "string" && author.trim()) {
+      parts.push(author.trim());
+    } else {
+      parts.push("Agostinho");
+    }
+    if (typeof title === "string" && title.trim()) {
+      parts.push(title.trim());
+    }
+    if (typeof section === "string" && section.trim()) {
+      parts.push(section.trim());
+    }
+    if (
+      typeof page === "number" ||
+      (typeof page === "string" && page.trim())
+    ) {
+      parts.push(String(page).trim());
+    }
+    if (typeof url === "string" && url.trim()) {
+      parts.push(url.trim());
+    }
+
+    return parts.length > 1 ? `[[${parts.join(", ")}]]` : null;
+  }
+
+  return null;
+};
+
 const generateEntryId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -90,6 +140,7 @@ const generateEntryId = () => {
 };
 
 export function ChatBox({ agentId, agentName }: ChatBoxProps) {
+  const { token, logout } = useAuth();
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState<ChatEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,6 +167,11 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
     const trimmed = message.trim();
     if (!trimmed || isLoading) return;
 
+    if (!token) {
+      setError("Sua sessão expirou. Faça login novamente para continuar.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -133,11 +189,17 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
     setMessage("");
 
     try {
-      const data = await postAsk({
-        agent: agentId,
-        message: trimmed,
-        stream: false,
-      });
+      const data = await postAsk(
+        {
+          agent: agentId,
+          message: trimmed,
+          stream: false,
+        },
+        {
+          token,
+          signal: undefined,
+        },
+      );
 
       setHistory((prev) =>
         prev.map((entry) =>
@@ -153,10 +215,15 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
         ),
       );
     } catch (apiError) {
-      console.error("Erro ao solicitar resposta:", apiError);
-      setError(
-        "Não foi possível obter uma resposta. Verifique se a API local está ativa.",
-      );
+      if (apiError instanceof UnauthorizedError) {
+        logout();
+        setError("Sessão expirada. Você será redirecionado para fazer login.");
+      } else {
+        console.error("Erro ao solicitar resposta:", apiError);
+        setError(
+          "Não foi possível obter uma resposta. Verifique se a API local está ativa.",
+        );
+      }
       setHistory((prev) => prev.filter((entry) => entry.id !== newEntry.id));
     } finally {
       setIsLoading(false);
@@ -207,55 +274,60 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
               </div>
             </div>
           ) : null}
-          {history.map((entry) => (
-            <article
-              key={entry.id}
-              className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/80 p-5"
-            >
-              <div className="flex items-start gap-3 rounded-2xl bg-white/90 p-4 ring-1 ring-[var(--border)] dark:bg-slate-800/85">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)]/15 text-sm font-semibold text-[var(--accent)]">
-                  Você
-                </div>
-                <p className="text-base leading-relaxed text-slate-700 dark:text-slate-200">
-                  {entry.question}
-                </p>
-              </div>
+          {history.map((entry) => {
+            const formattedCitations = (entry.response.citations ?? [])
+              .map((citation) => formatCitation(citation))
+              .filter((value): value is string => Boolean(value));
 
-              <div className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 ring-1 ring-[var(--border)] dark:bg-slate-900/70">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--accent-foreground)]">
-                  {entry.agentName[0]?.toUpperCase() ?? "IA"}
+            return (
+              <article
+                key={entry.id}
+                className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/80 p-5"
+              >
+                <div className="flex items-start gap-3 rounded-2xl bg-white/90 p-4 ring-1 ring-[var(--border)] dark:bg-slate-800/85">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)]/15 text-sm font-semibold text-[var(--accent)]">
+                    Você
+                  </div>
+                  <p className="text-base leading-relaxed text-slate-700 dark:text-slate-200">
+                    {entry.question}
+                  </p>
                 </div>
-                <div className="flex flex-col gap-3">
-                  {entry.response.answer ? (
-                    <ReactMarkdown
-                      className="flex flex-col gap-3 text-base leading-relaxed text-slate-700 dark:text-slate-200"
-                      remarkPlugins={[remarkGfm]}
-                      components={markdownComponents}
-                    >
-                      {entry.response.answer}
-                    </ReactMarkdown>
-                  ) : (
-                    <p className="text-sm text-slate-400 dark:text-slate-300">
-                      Elaborando resposta...
-                    </p>
-                  )}
-                  {entry.response.citations &&
-                    entry.response.citations.length > 0 && (
-                      <ul className="flex flex-col gap-1 rounded-xl bg-[var(--surface-muted)]/70 p-3 text-xs text-slate-500">
-                        {entry.response.citations.map((citation, index) => (
-                          <li key={`${entry.id}-citation-${index}`} className="font-medium">
-                            [[
-                            {typeof citation === "string"
-                              ? citation
-                              : JSON.stringify(citation)}]]
+
+                <div className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 ring-1 ring-[var(--border)] dark:bg-slate-900/70">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--accent-foreground)]">
+                    {entry.agentName[0]?.toUpperCase() ?? "IA"}
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {entry.response.answer ? (
+                      <ReactMarkdown
+                        className="flex flex-col gap-3 text-base leading-relaxed text-slate-700 dark:text-slate-200"
+                        remarkPlugins={[remarkGfm]}
+                        components={markdownComponents}
+                      >
+                        {entry.response.answer}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="text-sm text-slate-400 dark:text-slate-300">
+                        Elaborando resposta...
+                      </p>
+                    )}
+                    {formattedCitations.length > 0 && (
+                      <ul className="mt-2 flex flex-col gap-1 text-sm opacity-70">
+                        {formattedCitations.map((formatted, index) => (
+                          <li
+                            key={`${entry.id}-citation-${index}`}
+                            className="font-medium"
+                          >
+                            {formatted}
                           </li>
                         ))}
                       </ul>
                     )}
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </div>
 

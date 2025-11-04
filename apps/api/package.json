@@ -25,10 +25,15 @@
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/axios": "^3.0.0",
     "@nestjs/config": "^3.2.2",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
     "@prisma/client": "^6.2.1",
     "axios": "^1.7.2",
+    "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -58,6 +63,9 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],
     "rootDir": "src",
@@ -68,4 +76,3 @@
     "testEnvironment": "node"
   }
 }
-

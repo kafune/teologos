@@ -14,3 +14,36 @@ model ChatMessage {
   answer    String?
   createdAt DateTime @default(now())
 }
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CorpusDoc {
+  id        String    @id @default(cuid())
+  agentSlug String
+  title     String
+  sourceUrl String?
+  language  String    @default("pt-BR")
+  license   String?
+  s3Key     String?
+  createdAt DateTime  @default(now())
+  passages  Passage[]
+}
+
+model Passage {
+  id        String    @id @default(cuid())
+  docId     String
+  doc       CorpusDoc @relation(fields: [docId], references: [id])
+  agentSlug String
+  ord       Int
+  section   String?
+  page      String?
+  textHash  String
+  createdAt DateTime  @default(now())
+}

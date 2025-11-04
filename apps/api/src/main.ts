@@ -80,9 +80,56 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+
+  const normalizeOrigin = (origin?: string | null) => {
+    if (!origin) {
+      return origin;
+    }
+
+    const trimmed = origin.trim();
+
+    if (!trimmed || trimmed === '*') {
+      return trimmed;
+    }
+
+    return trimmed.replace(/\/$/, '');
+  };
+
+  const rawOrigins = configService.get<string>('CORS_ORIGINS');
+  const allowedOriginsList = rawOrigins
+    ? rawOrigins
+        .split(/[,\s]+/)
+        .map(normalizeOrigin)
+        .filter((origin): origin is string => Boolean(origin))
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+  const allowedOrigins = new Set(allowedOriginsList);
+
+  Logger.log(
+    `CORS habilitado para: ${Array.from(allowedOrigins).join(', ')}`,
+    'Bootstrap',
+  );
 
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: (requestOrigin, callback) => {
+      const normalizedOrigin = normalizeOrigin(requestOrigin);
+
+      const isAllowed =
+        !normalizedOrigin ||
+        allowedOrigins.has('*') ||
+        allowedOrigins.has(normalizedOrigin);
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      Logger.warn(
+        `Origem CORS bloqueada: ${requestOrigin} (permitidas: ${Array.from(allowedOrigins).join(', ')})`,
+        'Bootstrap',
+      );
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
   });
 
@@ -94,7 +141,6 @@ async function bootstrap() {
     }),
   );
 
-  const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 4000;
 
   await app.listen(port, '0.0.0.0');
