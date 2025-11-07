@@ -20,6 +20,7 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
+  role         UserRole @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -46,4 +47,17 @@ model Passage {
   page      String?
   textHash  String
   createdAt DateTime  @default(now())
+}
+
+model Agent {
+  id         String   @id
+  name       String
+  tradition  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum UserRole {
+  ADMIN
+  USER
 }

@@ -1,68 +1,7 @@
+import OpenAI from 'openai';
 import type { ContextPassage } from '../types/index.js';
 
 export type Passage = ContextPassage;
-
-type CohereEmbedParams = {
-  texts: string[];
-  model?: string;
-  inputType?: string;
-};
-
-type CohereEmbedResponse = {
-  embeddings?: number[][];
-};
-
-type CohereClientOptions = {
-  token: string;
-};
-
-class CohereClient {
-  private readonly token: string;
-
-  constructor(options: CohereClientOptions) {
-    if (!options?.token) {
-      throw new Error('CohereClient requires a token.');
-    }
-
-    this.token = options.token;
-
-    if (typeof fetch !== 'function') {
-      throw new Error('Global fetch is not available in this runtime.');
-    }
-  }
-
-  async embed(params: CohereEmbedParams): Promise<CohereEmbedResponse> {
-    const { texts, model, inputType } = params;
-
-    if (!Array.isArray(texts) || texts.length === 0) {
-      return { embeddings: [] };
-    }
-
-    const response = await fetch('https://api.cohere.com/v1/embed', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-        'Cohere-Version': '2022-12-06',
-      },
-      body: JSON.stringify({
-        texts,
-        model,
-        input_type: inputType,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Cohere embed failed (${response.status}): ${errorBody}`);
-    }
-
-    const data = (await response.json()) as CohereEmbedResponse;
-    return {
-      embeddings: Array.isArray(data.embeddings) ? data.embeddings : [],
-    };
-  }
-}
 
 type QdrantPayload = Record<string, unknown> & {
   text?: string;
@@ -139,19 +78,19 @@ class QdrantClient {
 }
 
 export class RagService {
-  private cohereClient: CohereClient | null = null;
+  private openaiClient: OpenAI | null = null;
   private qdrantClient: QdrantClient | null = null;
 
-  private getCohereClient(): CohereClient {
-    if (!this.cohereClient) {
-      const token = process.env.COHERE_API_KEY;
-      if (!token) {
-        throw new Error('COHERE_API_KEY is not configured.');
+  private getOpenAIClient(): OpenAI {
+    if (!this.openaiClient) {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error('OPENAI_API_KEY is not configured.');
       }
-      this.cohereClient = new CohereClient({ token });
+      this.openaiClient = new OpenAI({ apiKey });
     }
 
-    return this.cohereClient;
+    return this.openaiClient;
   }
 
   private getQdrantClient(): QdrantClient {
@@ -173,17 +112,26 @@ export class RagService {
     }
 
     const limit = Number.isFinite(topK) && topK > 0 ? Math.floor(topK) : 8;
-    const cohere = this.getCohereClient();
+    const openai = this.getOpenAIClient();
     const qdrant = this.getQdrantClient();
 
-    const embeddingResponse = await cohere.embed({
-      texts: [trimmedQuestion],
-      model: 'embed-multilingual-v3.0',
-      inputType: 'search_query',
-    });
+    const embedModel = process.env.OPENAI_EMBED_MODEL || 'text-embedding-3-small';
+    let embedding: number[] | undefined;
 
-    const embedding = embeddingResponse.embeddings?.[0];
-    if (!embedding || !Array.isArray(embedding) || !embedding.length) {
+    try {
+      const response = await openai.embeddings.create({
+        model: embedModel,
+        input: trimmedQuestion,
+      });
+      embedding = response?.data?.[0]?.embedding;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('OpenAI embeddings failed');
+    }
+
+    if (!Array.isArray(embedding) || embedding.length === 0) {
       return [];
     }
 

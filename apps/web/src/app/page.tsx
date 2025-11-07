@@ -11,7 +11,7 @@ import { useAuth } from "@/components/AuthProvider";
 type AgentOption = {
   id: string;
   label: string;
-  tradition: string;
+  tradition?: string | null;
 };
 
 export default function Home() {
@@ -101,8 +101,8 @@ export default function Home() {
   }, [agents, selectedAgentId]);
 
   return (
-    <div className="min-h-screen bg-[var(--background)] py-10 font-sans text-[var(--foreground)]">
-      <main className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-4xl flex-col gap-10 px-4 pb-16 md:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--background)] px-3 py-8 font-sans text-[var(--foreground)] sm:px-4 sm:py-10">
+      <main className="mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-4xl flex-col gap-8 px-0 pb-12 sm:min-h-[calc(100vh-5rem)] sm:gap-10 sm:px-4 sm:pb-16 md:px-6 lg:px-8">
         <Header
           agents={agents}
           selectedAgentId={selectedAgentId ?? ""}
@@ -122,11 +122,11 @@ export default function Home() {
             agentName={selectedAgent.label}
           />
         ) : isLoadingAgents ? (
-          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)]/90 p-6 text-center text-sm text-slate-500">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)]/90 p-6 text-center text-sm text-[var(--muted)]">
             Carregando agentes...
           </div>
         ) : (
-          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)]/90 p-6 text-center text-sm text-slate-500">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)]/90 p-6 text-center text-sm text-[var(--muted)]">
             Selecione um teólogo para iniciar a conversa.
           </div>
         )}

@@ -63,7 +63,7 @@ const markdownComponents = {
   blockquote({ ...props }) {
     return (
       <blockquote
-        className="border-l-4 border-[var(--accent)]/40 pl-4 text-slate-600 dark:text-slate-300"
+        className="border-l-4 border-[var(--accent)]/40 pl-4 text-[var(--muted)] dark:text-slate-300"
         {...props}
       />
     );
@@ -248,27 +248,27 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
   }, [agentId]);
 
   return (
-    <section className="flex h-full w-full flex-1 flex-col gap-6">
-      <div className="flex-1 overflow-hidden rounded-3xl bg-[var(--surface)]/90 p-6 shadow ring-1 ring-[var(--border)]/80 backdrop-blur">
+    <section className="flex h-full w-full flex-1 flex-col gap-5 sm:gap-6">
+      <div className="flex-1 overflow-hidden rounded-3xl bg-[var(--surface)]/90 p-4 shadow ring-1 ring-[var(--border)]/80 backdrop-blur sm:p-6">
         <div
           ref={chatViewportRef}
-          className="flex h-full flex-col gap-6 overflow-y-auto scroll-smooth pr-2"
+          className="flex h-full flex-col gap-5 overflow-y-auto scroll-smooth pr-1 sm:gap-6 sm:pr-2"
         >
           {history.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-4 text-center text-slate-400">
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-center text-[var(--muted)]">
               <Image
                 src="/globe.svg"
                 alt="Ícone decorativo de globo"
                 width={56}
                 height={56}
-                className="opacity-80"
+                className="h-12 w-12 opacity-80 sm:h-14 sm:w-14"
                 priority
               />
               <div>
-                <p className="text-base font-medium text-slate-500">
+                <p className="text-sm font-medium text-[var(--muted)] sm:text-base">
                   Converse com os maiores teólogos da história.
                 </p>
-                <p className="text-sm text-slate-400 dark:text-slate-200">
+                <p className="text-xs text-[var(--muted)] dark:text-slate-200 sm:text-sm">
                   Envie sua pergunta para {agentName} e receba uma resposta embasada.
                 </p>
               </div>
@@ -282,37 +282,37 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
             return (
               <article
                 key={entry.id}
-                className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/80 p-5"
+                className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/80 p-4 sm:p-5"
               >
-                <div className="flex items-start gap-3 rounded-2xl bg-white/90 p-4 ring-1 ring-[var(--border)] dark:bg-slate-800/85">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)]/15 text-sm font-semibold text-[var(--accent)]">
+                <div className="flex items-start gap-3 rounded-2xl bg-white/90 p-3.5 ring-1 ring-[var(--border)] dark:bg-slate-800/85 sm:gap-4 sm:p-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/15 text-xs font-semibold text-[var(--accent)] sm:h-9 sm:w-9 sm:text-sm">
                     Você
                   </div>
-                  <p className="text-base leading-relaxed text-slate-700 dark:text-slate-200">
+                  <p className="text-sm leading-relaxed text-[var(--foreground)] dark:text-slate-200 sm:text-base">
                     {entry.question}
                   </p>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 ring-1 ring-[var(--border)] dark:bg-slate-900/70">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-semibold text-[var(--accent-foreground)]">
+                <div className="flex items-start gap-3 rounded-2xl bg-white/80 p-3.5 ring-1 ring-[var(--border)] dark:bg-slate-900/70 sm:gap-4 sm:p-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-semibold text-[var(--accent-foreground)] sm:h-9 sm:w-9 sm:text-sm">
                     {entry.agentName[0]?.toUpperCase() ?? "IA"}
                   </div>
                   <div className="flex flex-col gap-3">
                     {entry.response.answer ? (
                       <ReactMarkdown
-                        className="flex flex-col gap-3 text-base leading-relaxed text-slate-700 dark:text-slate-200"
+                        className="flex flex-col gap-3 text-sm leading-relaxed text-[var(--foreground)] dark:text-slate-200 sm:text-base"
                         remarkPlugins={[remarkGfm]}
                         components={markdownComponents}
                       >
                         {entry.response.answer}
                       </ReactMarkdown>
                     ) : (
-                      <p className="text-sm text-slate-400 dark:text-slate-300">
+                      <p className="text-sm text-[var(--muted)] dark:text-slate-300">
                         Elaborando resposta...
                       </p>
                     )}
                     {formattedCitations.length > 0 && (
-                      <ul className="mt-2 flex flex-col gap-1 text-sm opacity-70">
+                      <ul className="mt-2 flex flex-col gap-1 text-xs opacity-70 sm:text-sm">
                         {formattedCitations.map((formatted, index) => (
                           <li
                             key={`${entry.id}-citation-${index}`}
@@ -333,9 +333,9 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
 
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-4 rounded-3xl bg-[var(--surface)]/95 p-5 shadow-sm ring-1 ring-[var(--border)]/80 backdrop-blur"
+        className="flex flex-col gap-3 rounded-3xl bg-[var(--surface)]/95 p-4 shadow-sm ring-1 ring-[var(--border)]/80 backdrop-blur sm:gap-4 sm:p-5"
       >
-        <label className="text-sm font-medium text-slate-500" htmlFor="message">
+        <label className="text-sm font-medium text-[var(--muted)]" htmlFor="message">
           Escreva sua pergunta
         </label>
         <textarea
@@ -346,7 +346,7 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
           onChange={(event) => setMessage(event.target.value)}
           onKeyDown={handleKeyDown}
           rows={4}
-          className="w-full resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-3 text-base text-slate-700 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-300 shadow-inner focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+          className="w-full min-h-[8rem] resize-none rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2.5 text-sm text-[var(--foreground)] shadow-inner placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 dark:text-slate-100 dark:placeholder:text-slate-300 sm:min-h-[9rem] sm:px-4 sm:py-3 sm:text-base"
         />
         {error && (
           <p className="text-sm font-medium text-red-500" role="alert">
@@ -354,13 +354,13 @@ export function ChatBox({ agentId, agentName }: ChatBoxProps) {
           </p>
         )}
         <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-          <p className="text-xs text-slate-400">
+          <p className="text-center text-xs text-[var(--muted)] sm:text-left">
             Pressione Enter para enviar ou Shift + Enter para pular linha.
           </p>
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="flex items-center gap-2 rounded-full bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-[var(--accent-foreground)] transition hover:bg-[var(--accent)]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent-foreground)] transition hover:bg-[var(--accent)]/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6"
           >
             {isLoading && (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent-foreground)] border-t-transparent" />

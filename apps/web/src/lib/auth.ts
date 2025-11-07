@@ -1,10 +1,15 @@
 "use client";
 
+import { buildApiUrl } from "./apiBaseUrl";
+
 const SESSION_STORAGE_KEY = "TeologOS.auth.session";
+
+export type UserRole = "ADMIN" | "USER";
 
 export type AuthUser = {
   id: string;
   email: string;
+  role: UserRole;
   name?: string | null;
 };
 
@@ -18,25 +23,15 @@ type LoginResponse = {
   user: AuthUser;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
-function normalizeBaseUrl(url: string): string {
-  return url.replace(/\/$/, "");
-}
-
 export async function requestLogin(email: string, password: string) {
-  const response = await fetch(
-    `${normalizeBaseUrl(API_BASE_URL)}/auth/login`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ email, password }),
+  const response = await fetch(buildApiUrl("/auth/login"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
-  );
+    body: JSON.stringify({ email, password }),
+  });
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -64,12 +59,22 @@ export function loadStoredSession(): AuthSession | null {
       return null;
     }
 
-    const parsed = JSON.parse(raw) as AuthSession;
+    const parsed = JSON.parse(raw) as Partial<AuthSession>;
     if (!parsed?.token || !parsed?.user?.id) {
       return null;
     }
 
-    return parsed;
+    const role = parsed.user.role ?? "USER";
+
+    return {
+      token: parsed.token,
+      user: {
+        id: parsed.user.id,
+        email: parsed.user.email,
+        name: parsed.user.name ?? null,
+        role,
+      },
+    };
   } catch (error) {
     console.warn("Falha ao ler sessão armazenada:", error);
     return null;

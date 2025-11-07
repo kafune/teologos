@@ -36,38 +36,38 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] px-4 py-10 text-[var(--foreground)]">
-      <main className="mx-auto flex w-full max-w-md flex-col gap-8 rounded-3xl bg-[var(--surface)]/95 p-8 shadow-sm ring-1 ring-[var(--border)]/80 backdrop-blur">
+    <div className="min-h-screen bg-[var(--background)] px-3 py-8 text-[var(--foreground)] sm:px-4 sm:py-10">
+      <main className="mx-auto flex w-full max-w-md flex-col gap-6 rounded-3xl bg-[var(--surface)]/95 p-6 shadow-sm ring-1 ring-[var(--border)]/80 backdrop-blur sm:gap-8 sm:p-8">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+          <h1 className="text-2xl font-semibold text-[var(--foreground)] dark:text-slate-100 sm:text-3xl">
             Acesse sua conta
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-[var(--muted)]">
             Entre com suas credenciais para conversar com os teólogos digitais.
           </p>
         </div>
 
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-2 text-sm">
-            <span className="font-medium text-slate-600">Email</span>
+            <span className="font-medium text-[var(--muted)]">Email</span>
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="voce@exemplo.com"
-              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-3 text-base text-slate-900 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 dark:text-slate-100"
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-2.5 text-base text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 dark:text-slate-100"
               required
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm">
-            <span className="font-medium text-slate-600">Senha</span>
+            <span className="font-medium text-[var(--muted)]">Senha</span>
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="********"
-              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-3 text-base text-slate-900 focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 dark:text-slate-100"
+              className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 px-4 py-2.5 text-base text-[var(--foreground)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 dark:text-slate-100"
               required
             />
           </label>
@@ -87,11 +87,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-500">
+        <p className="text-center text-sm text-[var(--muted)]">
           Esqueceu sua senha? Entre em contato com o administrador.
         </p>
 
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-[var(--muted)]">
           <Link href="/" className="text-[var(--accent)] hover:underline">
             Voltar para a página inicial
           </Link>

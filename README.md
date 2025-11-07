@@ -15,3 +15,6 @@ Execute com Docker Compose.
 - qdrant: vetores
 - db: Postgres
 - minio: storage S3-compatível
+
+## Testes
+- Web: `./scripts/test-web.sh`

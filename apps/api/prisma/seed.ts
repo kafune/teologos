@@ -12,17 +12,39 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where: { email: seedEmail },
-    update: {},
+    update: {
+      role: 'ADMIN',
+    },
     create: {
       email: seedEmail,
       passwordHash,
       name: seedName,
+      role: 'ADMIN',
     },
   });
 
   console.log(
     `Usuário seed criado/atualizado: ${user.email}. Senha padrão: ${seedPassword}`,
   );
+
+  const defaultAgents = [
+    { id: 'agostinho', name: 'Santo Agostinho', tradition: 'Patrística' },
+    { id: 'aquinas', name: 'Tomás de Aquino', tradition: 'Escolástica' },
+    { id: 'calvino', name: 'João Calvino', tradition: 'Reforma' },
+  ];
+
+  for (const agent of defaultAgents) {
+    await prisma.agent.upsert({
+      where: { id: agent.id },
+      update: {
+        name: agent.name,
+        tradition: agent.tradition,
+      },
+      create: agent,
+    });
+  }
+
+  console.log('Agentes padrão garantidos no banco de dados.');
 }
 
 main()

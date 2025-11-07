@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import os, sys, uuid, time, hashlib, re
+import os, sys, uuid, time, hashlib
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
-import cohere
-from cohere.errors import TooManyRequestsError
+from openai import OpenAI, APIError, RateLimitError
 from pypdf import PdfReader
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, VectorParams, Distance
@@ -65,12 +64,11 @@ def chunk_words(words: Sequence[str], page_map: Sequence[int], chunk_size: int, 
 
 # ---------- Embeddings (batched) ----------
 def embed_texts_batched(
-    co: cohere.Client,
+    client: OpenAI,
     texts: List[str],
     model: str,
     batch: int = 32,
     pause: float = 0.0,
-    input_type: str = "search_document",
 ) -> List[List[float]]:
     out: List[List[float]] = []
     max_attempts = 10
@@ -79,33 +77,29 @@ def embed_texts_batched(
         attempt = 0
         while True:
             try:
-                resp = co.embed(texts=part, model=model, input_type=input_type)
-                out.extend(resp.embeddings)
+                resp = client.embeddings.create(model=model, input=part)
+                out.extend([item.embedding for item in resp.data])
                 break
-            except TooManyRequestsError as e:
+            except RateLimitError as e:
                 attempt += 1
                 if attempt >= max_attempts:
                     raise
                 wait = 10.0
-                headers = getattr(e, "headers", {}) or {}
+                response = getattr(e, "response", None)
+                headers = getattr(response, "headers", {}) or {}
                 retry_after = headers.get("retry-after") or headers.get("Retry-After")
                 if retry_after:
                     try:
                         wait = float(retry_after)
                     except ValueError:
                         pass
-                elif isinstance(getattr(e, "body", None), dict):
-                    message = e.body.get("message", "")
-                    match = re.search(r"(\d+(?:\.\d+)?)", message or "")
-                    if match:
-                        wait = float(match.group(1))
                 print(
-                    f"⚠️  Rate limit na Cohere, aguardando {wait:.1f}s (tentativa {attempt}/{max_attempts})...",
+                    f"⚠️  Rate limit na OpenAI, aguardando {wait:.1f}s (tentativa {attempt}/{max_attempts})...",
                     file=sys.stderr,
                 )
                 time.sleep(wait)
                 continue
-            except Exception as e:
+            except APIError as e:
                 attempt += 1
                 if attempt >= max_attempts:
                     raise
@@ -115,15 +109,47 @@ def embed_texts_batched(
                     file=sys.stderr,
                 )
                 time.sleep(backoff)
+                continue
+            except Exception as e:
+                attempt += 1
+                if attempt >= max_attempts:
+                    raise
+                backoff = 1.5 * attempt
+                print(
+                    f"⚠️  Erro inesperado ao gerar embeddings ({e}), aguardando {backoff:.1f}s (tentativa {attempt}/{max_attempts})...",
+                    file=sys.stderr,
+                )
+                time.sleep(backoff)
         if pause:
             time.sleep(pause)
     return out
 
 # ---------- Qdrant ----------
-def ensure_collection(qd: QdrantClient, name: str, dim: int = 1024):
+def ensure_collection(qd: QdrantClient, name: str, dim: int):
     try:
-        qd.get_collection(name)
+        info = qd.get_collection(name)
     except Exception:
+        qd.recreate_collection(
+            collection_name=name,
+            vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
+        )
+        return
+
+    current_dim = None
+    try:
+        config = getattr(info, "config", None)
+        params = getattr(config, "params", None)
+        vectors_cfg = getattr(params, "vectors", None) if params else None
+        if vectors_cfg:
+            current_dim = getattr(vectors_cfg, "size", None)
+    except AttributeError:
+        current_dim = None
+
+    if current_dim and current_dim != dim:
+        print(
+            f"ℹ️  Ajustando coleção '{name}' de dimensão {current_dim} para {dim}.",
+            file=sys.stderr,
+        )
         qd.recreate_collection(
             collection_name=name,
             vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
@@ -169,7 +195,7 @@ def main():
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
-    COHERE_API_KEY = require_env("COHERE_API_KEY")
+    OPENAI_API_KEY = require_env("OPENAI_API_KEY")
     QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 
     words, page_map = extract_pdf_words(pdf_path)
@@ -177,30 +203,32 @@ def main():
     if not chunks:
         raise RuntimeError("No chunks produced from the PDF.")
 
-    co = cohere.Client(COHERE_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY)
     texts = [c["text"] for c in chunks]
     try:
-        embed_batch = int(os.getenv("COHERE_EMBED_BATCH", "") or 32)
+        embed_batch = int(os.getenv("OPENAI_EMBED_BATCH", "") or 32)
     except ValueError:
         embed_batch = 32
     embed_batch = max(1, embed_batch)
     try:
-        embed_pause = float(os.getenv("COHERE_EMBED_PAUSE", "") or 0.0)
+        embed_pause = float(os.getenv("OPENAI_EMBED_PAUSE", "") or 0.0)
     except ValueError:
         embed_pause = 0.0
-    embed_input_type = os.getenv("COHERE_EMBED_INPUT_TYPE", "search_document")
+    embed_model = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
     embs = embed_texts_batched(
-        co,
+        client,
         texts,
-        model="embed-multilingual-v3.0",
+        model=embed_model,
         batch=embed_batch,
         pause=embed_pause,
-        input_type=embed_input_type,
     )
 
     qd = QdrantClient(url=QDRANT_URL)
     collection = f"passages_{agent}"
-    ensure_collection(qd, collection, dim=1024)
+    vector_size = len(embs[0]) if embs else 0
+    if vector_size <= 0:
+        raise RuntimeError("Failed to generate embeddings.")
+    ensure_collection(qd, collection, dim=vector_size)
 
     payload_base = {
         "agentSlug": agent,

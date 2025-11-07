@@ -96,6 +96,65 @@ async function bootstrap() {
     return trimmed.replace(/\/$/, '');
   };
 
+  const isPrivateHostname = (hostname: string) => {
+    if (!hostname) {
+      return false;
+    }
+
+    const normalized = hostname.toLowerCase();
+
+    if (
+      normalized === 'localhost' ||
+      normalized === '0.0.0.0' ||
+      normalized === '127.0.0.1'
+    ) {
+      return true;
+    }
+
+    if (normalized.endsWith('.local')) {
+      return true;
+    }
+
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(normalized)) {
+      const [first, second] = normalized.split('.').map(Number);
+
+      if (first === 10 || first === 127) {
+        return true;
+      }
+
+      if (first === 192 && second === 168) {
+        return true;
+      }
+
+      if (first === 172 && second >= 16 && second <= 31) {
+        return true;
+      }
+    }
+
+    if (
+      normalized.startsWith('fe80') ||
+      normalized.startsWith('fc') ||
+      normalized.startsWith('fd')
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const isPrivateNetworkOrigin = (origin?: string | null) => {
+    if (!origin) {
+      return false;
+    }
+
+    try {
+      const { hostname } = new URL(origin);
+      return isPrivateHostname(hostname);
+    } catch {
+      return false;
+    }
+  };
+
   const rawOrigins = configService.get<string>('CORS_ORIGINS');
   const allowedOriginsList = rawOrigins
     ? rawOrigins
@@ -105,6 +164,14 @@ async function bootstrap() {
     : ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
   const allowedOrigins = new Set(allowedOriginsList);
+
+  const allowPrivateOriginsValue = configService.get(
+    'ALLOW_PRIVATE_NETWORK_CORS',
+  );
+  const allowPrivateOrigins =
+    allowPrivateOriginsValue === undefined
+      ? true
+      : String(allowPrivateOriginsValue).toLowerCase() !== 'false';
 
   Logger.log(
     `CORS habilitado para: ${Array.from(allowedOrigins).join(', ')}`,
@@ -118,7 +185,8 @@ async function bootstrap() {
       const isAllowed =
         !normalizedOrigin ||
         allowedOrigins.has('*') ||
-        allowedOrigins.has(normalizedOrigin);
+        allowedOrigins.has(normalizedOrigin) ||
+        (allowPrivateOrigins && isPrivateNetworkOrigin(requestOrigin));
 
       if (isAllowed) {
         return callback(null, true);
